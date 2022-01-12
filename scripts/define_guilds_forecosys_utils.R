@@ -1,3 +1,68 @@
+read_coverage <- function(genome2representative.file, coveragelong.file, metadata.file) {
+  # ecosysguilds = read.table(file.path("/Users/ukaraoz/Work/Isogenie/IsogenieGenomes/permafrost-modelling/results", "IsogenieGenomes.ecosysguilds.xls"), sep = "\t")
+  # # 1,529 Stordalen MAGs dereplicated into 647 genomes
+  # genomes_ecosysguilds = setdiff(ecosysguilds[,1], c("genome","")) %>% tibble::as_tibble() %>% dplyr::pull(value)
+  # genome2representativeGenomes = read.table(genome2representative.file, header = T, check.names = F, sep = "\t") %>% 
+  #   tibble::as_tibble() %>%
+  #   dplyr::pull(c("Genome")) %>% unique()
+  # genome2representativeClusterReps = read.table(genome2representative.file, header = T, check.names = F, sep = "\t") %>% 
+  #     tibble::as_tibble() %>%
+  #     dplyr::pull(c("97% ANI cluster representative")) %>% unique()
+
+  # 647 representatives
+  genome2representative = read.table(genome2representative.file, header = T, check.names = F, sep = "\t") %>% 
+    tibble::as_tibble() %>%
+    dplyr::select(c("Genome", "97% ANI cluster representative", "Clade name", "Named subclade"))
+  
+  # read coverage
+  coveragelong = read.table(coveragelong.file, header = T, sep = "\t") %>% tibble::as_tibble()
+  sample2metadata = read.table(metadata.file, header = T, sep = "\t") %>% 
+    tibble::as_tibble() %>% 
+    dplyr::mutate(samplelong = paste0("month=", month, "_",
+                                      "year=", year, "_", 
+                                      "habitat=", habitat, "_",
+                                      "core=", core, "_",
+                                      "depth=", depth, "_",
+                                      "id=", sample)) %>%
+    dplyr::select(c("sample", "samplelong"))
+  coveragelong = coveragelong %>% dplyr::left_join(sample2metadata, by = c("sample" = "sample"))
+  coveragewide = coveragelong %>% 
+    dplyr::select(c("genome", "samplelong", "coverage")) %>% 
+    tidyr::pivot_wider(names_from = samplelong, values_from = coverage) %>% 
+    # join coverage with cluster representative info
+    dplyr::left_join(genome2representative, by = c("genome" = "Genome")) %>% 
+    dplyr::select(-c("genome", "Clade name", "Named subclade")) %>%
+    #dplyr::select(c("genome", "97% ANI cluster representative", "Clade name", "Named subclade"), everything())
+    dplyr::select(c("97% ANI cluster representative"), everything()) %>%
+    dplyr::mutate(`ANI97%clusterrepresentative` = `97% ANI cluster representative`)
+
+  relabundwide = coveragelong %>% 
+    dplyr::select(c("genome", "samplelong", "relative_abundance")) %>% 
+    tidyr::pivot_wider(names_from = samplelong, values_from = relative_abundance) %>% 
+    # join coverage with cluster representative info
+    dplyr::left_join(genome2representative, by = c("genome" = "Genome")) %>% 
+    dplyr::select(-c("genome", "Clade name", "Named subclade")) %>%
+    #dplyr::select(c("genome", "97% ANI cluster representative", "Clade name", "Named subclade"), everything())
+    dplyr::select(c("97% ANI cluster representative"), everything()) %>%
+    dplyr::mutate(`ANI97%clusterrepresentative` = `97% ANI cluster representative`)
+
+  relabundofrecovered = coveragelong %>% 
+    dplyr::select(c("genome", "samplelong", "relative_abundance_of_recovered")) %>% 
+    tidyr::pivot_wider(names_from = samplelong, values_from = relative_abundance_of_recovered) %>% 
+    # join coverage with cluster representative info
+    dplyr::left_join(genome2representative, by = c("genome" = "Genome")) %>% 
+    dplyr::select(-c("genome", "Clade name", "Named subclade")) %>%
+    #dplyr::select(c("genome", "97% ANI cluster representative", "Clade name", "Named subclade"), everything())
+    dplyr::select(c("97% ANI cluster representative"), everything()) %>%
+    dplyr::mutate(`ANI97%clusterrepresentative` = `97% ANI cluster representative`)
+
+  result = list()
+  result$coverage = coveragewide
+  result$relabund = relabundwide
+  result$relabundofrecovered = relabundofrecovered
+  result
+}
+
 build_metadata <- function(taxonomy.file, metadata.file) {
   taxonomy = read.table(taxonomy.file, header = T, sep = "\t") %>% tibble::as_tibble() %>%
     dplyr::mutate(sample = stringr::str_replace(`genome`, "(.*)\\.(.*)\\.(.*)", "\\2"))
